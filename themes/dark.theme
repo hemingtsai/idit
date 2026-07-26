@@ -1,0 +1,32 @@
+# idit Dark Theme (high contrast)
+# Color names: black, red, green, yellow, blue, magenta, cyan, white
+# Bright variants: bright_black, bright_red, bright_green, bright_yellow,
+#                  bright_blue, bright_magenta, bright_cyan, bright_white
+
+[colors]
+# Main background/foreground
+background = black
+foreground = bright_white
+
+# Status bar at top
+status_bar_bg = bright_black
+status_bar_fg = bright_white
+
+# Line numbers
+line_number_fg = bright_cyan
+
+# Current line highlight
+highlight_bg = bright_yellow
+highlight_fg = black
+
+# Search match highlight
+search_match_bg = bright_red
+search_match_fg = black
+
+# Truncation marker '>' at end of overflowing lines
+truncation_bg = bright_magenta
+truncation_fg = black
+
+# Search bar
+search_bar_bg = bright_green
+search_bar_fg = black

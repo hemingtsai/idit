@@ -1,0 +1,32 @@
+# idit Default Theme
+# Color names: black, red, green, yellow, blue, magenta, cyan, white
+# Bright variants: bright_black, bright_red, bright_green, bright_yellow,
+#                  bright_blue, bright_magenta, bright_cyan, bright_white
+
+[colors]
+# Main background/foreground
+background = black
+foreground = white
+
+# Status bar at top
+status_bar_bg = blue
+status_bar_fg = white
+
+# Line numbers
+line_number_fg = green
+
+# Current line highlight
+highlight_bg = yellow
+highlight_fg = black
+
+# Search match highlight
+search_match_bg = red
+search_match_fg = white
+
+# Truncation marker '>' at end of overflowing lines
+truncation_bg = red
+truncation_fg = white
+
+# Search bar
+search_bar_bg = cyan
+search_bar_fg = black
