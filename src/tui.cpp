@@ -329,13 +329,15 @@ void TUI::draw_search_bar() {
     mvhline(row, 0, ' ', cols_);
 
     std::ostringstream oss;
-    oss << " /" << search_.pattern;
+    oss << (full_search_ ? " \\" : " /") << search_.pattern;
 
     if (!search_.match_lines.empty()) {
         oss << "   Match " << (search_.current_match + 1)
             << "/" << search_.match_lines.size();
+        if (full_search_) oss << " (scanning)";
     } else if (!search_.pattern.empty()) {
         oss << "   [No matches]";
+        if (full_search_) oss << " — try n/N to scan";
     }
 
     std::string bar = oss.str();
@@ -369,7 +371,7 @@ void TUI::draw_bottom_bar() {
         msg = " " + status_msg_;
     } else {
         msg = " q:quit  j/k:move  h/l:scroll  f:follow  /:search  "
-              "n/N:match  PgUp/Dn:chunk  g/G:top/bot  ::jump  "
+              "\\:full  n/N:match  PgUp/Dn:chunk  g/G:top/bot  ::jump  "
               "0/$:line-start/end";
     }
 
@@ -447,11 +449,21 @@ bool TUI::handle_input() {
         break;
 
     case '/':
+        full_search_ = false;
         search_.active = true;
         search_.pattern.clear();
         search_.match_lines.clear();
         search_.current_match = -1;
-        set_status("Search mode");
+        set_status("Search (current viewport)");
+        break;
+
+    case '\\':
+        full_search_ = true;
+        search_.active = true;
+        search_.pattern.clear();
+        search_.match_lines.clear();
+        search_.current_match = -1;
+        set_status("Full search (all chunks)");
         break;
 
     case ':':
@@ -503,12 +515,17 @@ void TUI::handle_search_input(int ch) {
     switch (ch) {
     case 27: // Escape
         search_.active = false;
+        full_search_ = false;
         set_status("Search cancelled");
         break;
 
     case '\n':
     case KEY_ENTER:
         perform_search();
+        // Full search: if no match in current chunk, scan forward
+        if (full_search_ && search_.match_lines.empty()) {
+            search_forward_chunks();
+        }
         if (!search_.match_lines.empty()) {
             search_.current_match = 0;
             cursor_line_ = search_.match_lines[0];
@@ -610,25 +627,118 @@ void TUI::perform_search() {
 }
 
 void TUI::navigate_search(bool forward) {
-    if (!search_.active || search_.match_lines.empty()) return;
+    if (!search_.active || search_.pattern.empty()) return;
 
-    if (forward) {
-        search_.current_match++;
-        if (search_.current_match >= static_cast<ssize_t>(search_.match_lines.size())) {
-            search_.current_match = 0;
+    if (!search_.match_lines.empty()) {
+        // Navigate within current chunk
+        if (forward) {
+            search_.current_match++;
+            if (search_.current_match >= static_cast<ssize_t>(search_.match_lines.size())) {
+                // Last match in chunk — if full search, try next chunk
+                if (full_search_) {
+                    search_forward_chunks();
+                    return;
+                }
+                search_.current_match = 0; // wrap in viewport mode
+            }
+        } else {
+            search_.current_match--;
+            if (search_.current_match < 0) {
+                // First match in chunk — if full search, try previous chunk
+                if (full_search_) {
+                    search_backward_chunks();
+                    return;
+                }
+                search_.current_match = static_cast<ssize_t>(search_.match_lines.size()) - 1;
+            }
         }
-    } else {
-        search_.current_match--;
-        if (search_.current_match < 0) {
-            search_.current_match = static_cast<ssize_t>(search_.match_lines.size()) - 1;
+
+        if (search_.current_match >= 0 &&
+            static_cast<size_t>(search_.current_match) < search_.match_lines.size()) {
+            cursor_line_ = search_.match_lines[search_.current_match];
+            scroll_x_ = 0;
+        }
+    } else if (full_search_) {
+        // No matches in current chunk but full search active — try forward
+        if (forward) {
+            search_forward_chunks();
+        } else {
+            search_backward_chunks();
         }
     }
+}
 
-    if (search_.current_match >= 0 &&
-        static_cast<size_t>(search_.current_match) < search_.match_lines.size()) {
-        cursor_line_ = search_.match_lines[search_.current_match];
+// ---------------------------------------------------------------------------
+// Full-file search helpers — scan forward/backward across chunk boundaries
+// ---------------------------------------------------------------------------
+
+void TUI::search_forward_chunks() {
+    if (!full_search_ || !reader_.has_next()) {
+        set_status("No more matches in file");
+        return;
+    }
+
+    int chunks_scanned = 0;
+    const int max_scan = 500; // safety limit
+
+    while (reader_.has_next() && chunks_scanned < max_scan) {
+        size_t prev_count = lines_.size();
+        auto new_lines = reader_.read_forward();
+        update_global_base_forward(prev_count);
+        lines_ = std::move(new_lines);
+        cursor_line_ = 0;
         scroll_x_ = 0;
+        chunks_scanned++;
+
+        perform_search();
+        if (!search_.match_lines.empty()) {
+            search_.current_match = 0;
+            cursor_line_ = search_.match_lines[0];
+            set_status("Found in chunk L" + std::to_string(global_line_base_ + 1));
+            return;
+        }
     }
+
+    set_status("Scanned " + std::to_string(chunks_scanned) +
+               " chunks — no match");
+}
+
+void TUI::search_backward_chunks() {
+    if (!full_search_ || !reader_.has_prev()) {
+        set_status("No more matches in file");
+        return;
+    }
+
+    int chunks_scanned = 0;
+    const int max_scan = 500;
+
+    while (reader_.has_prev() && chunks_scanned < max_scan) {
+        auto new_lines = reader_.read_backward();
+        if (new_lines.empty()) break;
+
+        if (global_line_base_ >= new_lines.size()) {
+            global_line_base_ -= static_cast<uint64_t>(new_lines.size());
+        } else {
+            global_line_base_ = 0;
+        }
+
+        lines_ = std::move(new_lines);
+        cursor_line_ = lines_.size() > 0 ? lines_.size() - 1 : 0;
+        scroll_x_ = 0;
+        chunks_scanned++;
+
+        perform_search();
+        if (!search_.match_lines.empty()) {
+            // Go to the last match in this chunk (since we came from the end)
+            search_.current_match = static_cast<ssize_t>(search_.match_lines.size()) - 1;
+            cursor_line_ = search_.match_lines[search_.current_match];
+            set_status("Found in chunk L" + std::to_string(global_line_base_ + 1));
+            return;
+        }
+    }
+
+    set_status("Scanned " + std::to_string(chunks_scanned) +
+               " chunks — no match");
 }
 
 // ============================================================================

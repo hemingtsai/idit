@@ -64,6 +64,10 @@ private:
     void jump_to_line(int target_line);
     void toggle_follow();
 
+    // Full-search chunk scanning
+    void search_forward_chunks();
+    void search_backward_chunks();
+
     // --- Helpers ---
     int  content_height() const;
     int  content_width() const;
@@ -88,6 +92,9 @@ private:
     bool running_ = true;
 
     SearchState search_;
+
+    /// Whether the current search is full-file (\\) or viewport-only (/).
+    bool full_search_ = false;
 
     /// Command mode: user typed ':' and is entering a line number.
     bool command_mode_ = false;

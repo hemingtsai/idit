@@ -55,7 +55,8 @@ idit [OPTIONS] <file>
 | `PgUp` / `PgDn` | Load previous/next chunk |
 | `0` / `$` | Scroll to line start/end |
 | `f` | Toggle follow mode |
-| `/` | Search (Enter to confirm, Esc to cancel) |
+| `/` | Search within current viewport |
+| `\` | Full-file search (scans across chunks) |
 | `n` / `N` | Next/previous search match |
 | `r` | Reload current chunk |
 
