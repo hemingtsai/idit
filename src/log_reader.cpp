@@ -206,12 +206,26 @@ std::vector<std::string> LogReader::read_backward() {
 }
 
 std::vector<std::string> LogReader::reload() {
+    was_truncated_ = false;
+
     struct stat st;
     if (::fstat(fd_, &st) < 0) {
         return {};
     }
 
     uint64_t new_size = static_cast<uint64_t>(st.st_size);
+
+    if (new_size < file_size_) {
+        // File was truncated (e.g., logrotate)
+        was_truncated_ = true;
+        file_size_ = new_size;
+        chunk_start_ = 0;
+        chunk_end_ = 0;
+        partial_line_.clear();
+        line_offsets_.clear();
+        return {};
+    }
+
     if (new_size <= file_size_) {
         file_size_ = new_size;
         return {};

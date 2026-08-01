@@ -55,6 +55,9 @@ public:
     bool has_prev() const { return chunk_start_ > 0; }
     bool has_next() const { return chunk_end_ < file_size_; }
 
+    /// Returns true if the last reload() detected file truncation.
+    bool was_truncated() const { return was_truncated_; }
+
     const std::string& path() const { return path_; }
     const std::vector<size_t>& line_offsets() const { return line_offsets_; }
 
@@ -71,4 +74,5 @@ private:
     ReadOptions opts_;
     std::string partial_line_;
     std::vector<size_t> line_offsets_;
+    bool was_truncated_ = false;
 };
