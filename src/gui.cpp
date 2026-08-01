@@ -272,45 +272,48 @@ void GUI::renderToolbar() {
     ImGui::SameLine(4);
 
     // Navigation
-    if (ImGui::Button(" ▲ "))  viewer_->moveCursor(-1);
-    ImGui::SameLine();
-    if (ImGui::Button(" ▼ "))  viewer_->moveCursor(1);
-    ImGui::SameLine(0, 12);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 3));
+    if (ImGui::ArrowButton("##up", ImGuiDir_Up))    viewer_->moveCursor(-1);
+    ImGui::SameLine(0, 2);
+    if (ImGui::ArrowButton("##down", ImGuiDir_Down)) viewer_->moveCursor(1);
+    ImGui::PopStyleVar();
+    ImGui::SameLine(0, 10);
 
-    if (ImGui::Button("◀ Chunk")) viewer_->loadPrevChunk();
-    ImGui::SameLine();
-    if (ImGui::Button("Chunk ▶")) viewer_->loadNextChunk();
+    if (ImGui::Button("Prev Chunk")) viewer_->loadPrevChunk();
+    ImGui::SameLine(0, 2);
+    if (ImGui::Button("Next Chunk")) viewer_->loadNextChunk();
     ImGui::SameLine(0, 12);
 
     // Search
-    if (ImGui::Button("/ Find")) openSearchBar(false);
-    ImGui::SameLine();
-    if (ImGui::Button("<")) viewer_->navigateSearch(false);
-    ImGui::SameLine();
-    if (ImGui::Button(">")) viewer_->navigateSearch(true);
+    if (ImGui::Button("Find...")) openSearchBar(false);
+    ImGui::SameLine(0, 2);
+    if (ImGui::Button("< Match")) viewer_->navigateSearch(false);
+    ImGui::SameLine(0, 2);
+    if (ImGui::Button("Match >")) viewer_->navigateSearch(true);
     ImGui::SameLine(0, 12);
 
     // Jump
-    if (ImGui::Button(": Go to line")) openCommandBar();
+    if (ImGui::Button("Go to Line...")) openCommandBar();
     ImGui::SameLine(0, 12);
 
     // Top/Bottom
-    if (ImGui::Button("⇤ Top")) viewer_->goToTop();
-    ImGui::SameLine();
-    if (ImGui::Button("⇥ End")) viewer_->goToBottom();
+    if (ImGui::Button("Top")) viewer_->goToTop();
+    ImGui::SameLine(0, 2);
+    if (ImGui::Button("End")) viewer_->goToBottom();
     ImGui::SameLine(0, 12);
 
     // Follow / Reload
     bool follow = viewer_->followMode();
     if (follow) {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.2f, 0.8f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.6f, 0.25f, 0.9f));
     }
-    if (ImGui::Button(follow ? "● Follow ON" : "○ Follow")) viewer_->toggleFollow();
+    if (ImGui::Button(follow ? "Following" : "Follow")) viewer_->toggleFollow();
     if (follow) {
-        ImGui::PopStyleColor();
+        ImGui::PopStyleColor(2);
     }
-    ImGui::SameLine();
-    if (ImGui::Button("↻ Reload")) viewer_->reloadChunk();
+    ImGui::SameLine(0, 2);
+    if (ImGui::Button("Reload")) viewer_->reloadChunk();
 
     ImGui::EndChild();
 }
@@ -425,7 +428,7 @@ void GUI::renderSearchBar() {
     }
 
     ImGui::SameLine();
-    if (ImGui::Button("✕")) closeSearchBar(false);
+    if (ImGui::Button(" Cancel ")) closeSearchBar(false);
 
     ImGui::PopStyleVar();
 }
@@ -450,7 +453,7 @@ void GUI::renderCommandBar() {
 
     ImGui::PopItemWidth();
     ImGui::SameLine();
-    if (ImGui::Button("✕")) closeCommandBar(false);
+    if (ImGui::Button(" Cancel ")) closeCommandBar(false);
 
     ImGui::PopStyleVar();
 }
