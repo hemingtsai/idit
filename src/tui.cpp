@@ -42,8 +42,9 @@ bool TUI::init(const Theme& theme) {
 // ============================================================================
 
 void TUI::run(LogViewer& viewer, const std::string& filepath,
-              const ReadOptions& opts, bool followMode) {
+              const ReadOptions& opts, Config& config, bool followMode) {
     viewer_ = &viewer;
+    config_ = &config;
 
     if (!viewer_->open(filepath, opts)) {
         endwin();
@@ -85,6 +86,12 @@ int TUI::contentWidth() const {
 
 void TUI::render() {
     erase();
+
+    if (settingsActive_) {
+        drawSettings();
+        refresh();
+        return;
+    }
 
     if (has_colors()) {
         drawStatusBar();
@@ -360,6 +367,14 @@ bool TUI::handleInput() {
     int ch = getch();
     if (ch == ERR) return false;
 
+    // Settings screen has its own input handling
+    if (settingsActive_) {
+        if (ch == 'S' || ch == 's' || ch == 27) { // Esc or S to close
+            settingsActive_ = false;
+        }
+        return true;
+    }
+
     if (viewer_->isCommandMode()) {
         handleCommandInput(ch);
         return true;
@@ -448,6 +463,10 @@ bool TUI::handleInput() {
         viewer_->scrollToLineStart();
         break;
 
+    case 'S':   // Settings
+        settingsActive_ = true;
+        break;
+
     case '$':
         viewer_->scrollToLineEnd();
         // Clamp to actual viewport
@@ -528,4 +547,46 @@ void TUI::handleCommandInput(int ch) {
         }
         break;
     }
+}
+
+// ============================================================================
+// Settings screen
+// ============================================================================
+
+void TUI::drawSettings() {
+    int attr = COLOR_PAIR(CP_STATUS_BAR);
+    attron(attr);
+    mvhline(0, 0, ' ', cols_);
+    mvaddstr(0, 2, " Settings ");
+    attroff(attr);
+
+    int row = 2;
+    int col = 4;
+    mvprintw(row, col, "Configuration: ~/.config/idit/config.lua");
+    row += 2;
+
+    mvprintw(row, col, "  UI Font:       %-20s  (size: %.0f)",
+             config_->settings.uiFont.family.c_str(),
+             config_->settings.uiFont.size);
+    row++;
+    mvprintw(row, col, "  Content Font:  %-20s  (size: %.0f)",
+             config_->settings.contentFont.family.c_str(),
+             config_->settings.contentFont.size);
+    row++;
+    mvprintw(row, col, "  Theme:         %-20s",
+             config_->settings.theme.c_str());
+    row++;
+    mvprintw(row, col, "  Window Lines:  %zu",
+             config_->settings.windowLines);
+    row++;
+    mvprintw(row, col, "  Chunk Size:    %zu bytes",
+             config_->settings.chunkSize);
+    row += 2;
+
+    mvprintw(row, col, "Edit ~/.config/idit/config.lua to change these values.");
+    row++;
+    mvprintw(row, col, "Themes are in ~/.config/idit/themes/<name>.lua");
+    row += 2;
+
+    mvprintw(row, col, "Press S or Esc to close.");
 }

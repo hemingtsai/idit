@@ -1,3 +1,4 @@
+#include "config.hpp"
 #include "log_reader.hpp"
 #include "log_viewer.hpp"
 #include "gui.hpp"
@@ -14,8 +15,8 @@ static void print_usage(const char* prog) {
               << "GUI log reader (ImGui frontend).\n"
               << "\n"
               << "Options:\n"
-              << "  -l, --window-lines N   Target lines per chunk (default: 200)\n"
-              << "  -s, --chunk-size N     Read chunk size in bytes (default: 65536)\n"
+              << "  -l, --window-lines N   Target lines per chunk (default: from config)\n"
+              << "  -s, --chunk-size N     Read chunk size in bytes (default: from config)\n"
               << "  -f, --follow           Follow mode (like tail -f)\n"
               << "  -h, --help             Show this help\n"
               << "\n"
@@ -31,6 +32,7 @@ static void print_usage(const char* prog) {
               << "  n / Shift+N             Next/previous search match\n"
               << "  :                       Jump to line number\n"
               << "  r                       Reload current chunk\n"
+              << "  S                       Open settings dialog\n"
               << std::endl;
 }
 
@@ -77,16 +79,24 @@ int main(int argc, char* argv[]) {
 
     std::string filepath = argv[optind];
 
+    // Load config (creates default if missing)
+    Config config;
+    config.load();
+
+    // Apply config defaults when CLI flags not set
+    if (opts.window_lines == 200)  opts.window_lines = config.settings.windowLines;
+    if (opts.chunk_size   == 65536) opts.chunk_size   = config.settings.chunkSize;
+
     // Create LogViewer core and GUI frontend
     LogViewer viewer;
     GUI gui;
 
-    if (!gui.init()) {
+    if (!gui.init(config)) {
         std::cerr << "Error: Failed to initialize GUI.\n";
         return 1;
     }
 
-    gui.run(viewer, filepath, opts, follow_mode);
+    gui.run(viewer, filepath, opts, config, follow_mode);
     gui.shutdown();
 
     return 0;

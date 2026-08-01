@@ -1,5 +1,6 @@
 #pragma once
 
+#include "config.hpp"
 #include "log_viewer.hpp"
 #include "theme.hpp"
 
@@ -7,9 +8,6 @@
 #include <string>
 
 /// ncurses-based TUI frontend for LogViewer.
-///
-/// Handles terminal I/O and rendering.  All state and logic lives in LogViewer;
-/// this class only reads state for drawing and forwards user input as actions.
 class TUI {
 public:
     TUI() = default;
@@ -18,12 +16,9 @@ public:
     TUI(const TUI&) = delete;
     TUI& operator=(const TUI&) = delete;
 
-    /// Initialize ncurses and apply the given theme.
     bool init(const Theme& theme);
-
-    /// Run the main loop: open file, poll, render, handle input.
     void run(LogViewer& viewer, const std::string& filepath,
-             const ReadOptions& opts, bool followMode);
+             const ReadOptions& opts, Config& config, bool followMode);
 
 private:
     // ---- UI helpers ----
@@ -41,12 +36,17 @@ private:
     void drawLineWithHighlights(int row, int col, const std::string& text,
                                 size_t lineIdx, int maxWidth);
 
+    // ---- Settings screen ----
+    void drawSettings();
+    bool settingsActive_ = false;
+
     // ---- Input ----
     bool handleInput();
     void handleSearchInput(int ch);
     void handleCommandInput(int ch);
 
     LogViewer* viewer_ = nullptr;
+    Config*    config_ = nullptr;
     Theme theme_;
 
     int rows_ = 0;

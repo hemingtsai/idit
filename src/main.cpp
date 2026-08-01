@@ -1,3 +1,4 @@
+#include "config.hpp"
 #include "log_reader.hpp"
 #include "log_viewer.hpp"
 #include "theme.hpp"
@@ -18,7 +19,7 @@ static void print_usage(const char* prog) {
               << "  -l, --window-lines N   Target lines per chunk (default: 200)\n"
               << "  -s, --chunk-size N     Read chunk size in bytes (default: 65536)\n"
               << "  -f, --follow           Follow mode (like tail -f)\n"
-              << "  -t, --theme FILE       Theme file path\n"
+              << "  -t, --theme FILE       Theme file path (overrides config)\n"
               << "  -h, --help             Show this help\n"
               << "\n"
               << "Keybindings:\n"
@@ -32,13 +33,14 @@ static void print_usage(const char* prog) {
               << "  /                       Search (Enter to confirm, Esc to cancel)\n"
               << "  n / N                   Next/previous search match\n"
               << "  r                       Reload current chunk\n"
+              << "  S                       Open settings\n"
               << std::endl;
 }
 
 int main(int argc, char* argv[]) {
     ReadOptions opts;
     bool follow_mode = false;
-    std::string theme_path;
+    std::string theme_path; // -t flag overrides config theme
 
     // clang-format off
     static struct option long_opts[] = {
@@ -83,6 +85,14 @@ int main(int argc, char* argv[]) {
 
     std::string filepath = argv[optind];
 
+    // Load config (creates default if missing)
+    Config config;
+    config.load();
+
+    // Apply config defaults when CLI flags not set
+    if (opts.window_lines == 200)  opts.window_lines = config.settings.windowLines;
+    if (opts.chunk_size   == 65536) opts.chunk_size   = config.settings.chunkSize;
+
     // Load theme
     Theme theme;
     if (!theme_path.empty()) {
@@ -90,6 +100,8 @@ int main(int argc, char* argv[]) {
             std::cerr << "Warning: Could not load theme '" << theme_path
                       << "', using defaults.\n";
         }
+    } else {
+        load_theme_by_name(config.settings.theme, theme);
     }
 
     // Create LogViewer core and TUI frontend
@@ -101,7 +113,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    tui.run(viewer, filepath, opts, follow_mode);
+    tui.run(viewer, filepath, opts, config, follow_mode);
 
     return 0;
 }

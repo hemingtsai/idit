@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -30,7 +31,7 @@ GUI::~GUI() {
     shutdown();
 }
 
-bool GUI::init() {
+bool GUI::init(Config& config) {
     glfwSetErrorCallback([](int, const char* desc) {
         fprintf(stderr, "GLFW error: %s\n", desc);
     });
@@ -63,7 +64,6 @@ bool GUI::init() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
-    // NOT enabling NavEnableKeyboard — we handle keys ourselves via GLFW
     io.IniFilename = nullptr;
 
     ImGui::StyleColorsDark();
@@ -79,6 +79,9 @@ bool GUI::init() {
     ImGui_ImplGlfw_InitForOpenGL(window_, true);
     ImGui_ImplOpenGL3_Init("#version 150");
 
+    // Load fonts from config
+    loadFonts(config);
+
     return true;
 }
 
@@ -91,6 +94,63 @@ void GUI::shutdown() {
         glfwTerminate();
         window_ = nullptr;
     }
+}
+
+// ============================================================================
+// Font loading
+// ============================================================================
+
+/// Resolve a font family name to a TTF path on macOS.
+static std::string resolveFontPath(const std::string& family) {
+    if (family == "default" || family.empty()) {
+        return ""; // use ImGui default
+    }
+    if (family == "monospace" || family == "mono") {
+        // Try common monospace fonts on macOS
+        const char* candidates[] = {
+            "/System/Library/Fonts/Menlo.ttc",
+            "/System/Library/Fonts/Monaco.ttf",
+            "/System/Library/Fonts/Courier.ttc",
+        };
+        for (const char* c : candidates) {
+            if (std::ifstream(c).good()) return c;
+        }
+        return ""; // fallback to default
+    }
+    // Treat as direct path
+    if (std::ifstream(family).good()) return family;
+    return "";
+}
+
+void GUI::loadFonts(Config& config) {
+    ImGuiIO& io = ImGui::GetIO();
+
+    // Clear default font first (added automatically by ImGui)
+    io.Fonts->Clear();
+
+    // UI font (used for toolbars, menus, dialogs)
+    std::string uiPath = resolveFontPath(config.settings.uiFont.family);
+    if (!uiPath.empty()) {
+        uiFont_ = io.Fonts->AddFontFromFileTTF(uiPath.c_str(),
+                                                config.settings.uiFont.size);
+    }
+    if (!uiFont_) {
+        uiFont_ = io.Fonts->AddFontDefault();
+    }
+
+    // Content font (monospace for log lines)
+    std::string contentPath = resolveFontPath(config.settings.contentFont.family);
+    if (!contentPath.empty()) {
+        ImFontConfig cfg;
+        cfg.MergeMode = false;
+        contentFont_ = io.Fonts->AddFontFromFileTTF(contentPath.c_str(),
+                                                     config.settings.contentFont.size);
+    }
+    if (!contentFont_) {
+        contentFont_ = uiFont_; // fallback to UI font
+    }
+
+    io.Fonts->Build();
 }
 
 // ============================================================================
@@ -156,6 +216,9 @@ void GUI::processKeyQueue() {
         break;
     case GLFW_KEY_END:       viewer_->goToBottom();      break;
     case GLFW_KEY_HOME:      viewer_->goToTop();         break;
+    case GLFW_KEY_S:
+        showSettings_ = !showSettings_;
+        break;
     default: break;
     }
 }
@@ -165,8 +228,9 @@ void GUI::processKeyQueue() {
 // ============================================================================
 
 void GUI::run(LogViewer& viewer, const std::string& filepath,
-              const ReadOptions& opts, bool followMode) {
+              const ReadOptions& opts, Config& config, bool followMode) {
     viewer_ = &viewer;
+    config_ = &config;
 
     if (!viewer_->open(filepath, opts)) {
         fprintf(stderr, "Error: Cannot open file '%s': %s\n",
@@ -238,6 +302,8 @@ void GUI::render() {
     renderStatusBar();
 
     ImGui::End();
+
+    if (showSettings_) renderSettingsDialog();
 }
 
 // ---- menu bar ----
@@ -314,6 +380,8 @@ void GUI::renderToolbar() {
     }
     ImGui::SameLine(0, 2);
     if (ImGui::Button("Reload")) viewer_->reloadChunk();
+    ImGui::SameLine(0, 12);
+    if (ImGui::Button("Settings")) showSettings_ = true;
 
     ImGui::EndChild();
 }
@@ -321,6 +389,8 @@ void GUI::renderToolbar() {
 // ---- content area ----
 
 void GUI::renderContent() {
+    if (contentFont_) ImGui::PushFont(contentFont_);
+
     const auto& lines = viewer_->lines();
     size_t lineCount  = lines.size();
     size_t cursorLine = viewer_->cursorLine();
@@ -393,6 +463,7 @@ void GUI::renderContent() {
         }
     }
     clipper.End();
+    if (contentFont_) ImGui::PopFont();
 }
 
 // ---- search bar ----
@@ -512,4 +583,109 @@ void GUI::closeCommandBar(bool confirm) {
     }
     viewer_->cancelCommand();
     commandBuf_[0] = '\0';
+}
+
+// ============================================================================
+// Settings dialog
+// ============================================================================
+
+void GUI::renderSettingsDialog() {
+    ImGui::OpenPopup("Settings");
+    ImGui::SetNextWindowSize(ImVec2(450, 380), ImGuiCond_Always);
+
+    if (ImGui::BeginPopupModal("Settings", &showSettings_,
+                               ImGuiWindowFlags_NoResize)) {
+        if (!config_) {
+            ImGui::Text("Config not available.");
+            ImGui::EndPopup();
+            return;
+        }
+
+        ImGui::Text("Configuration: ~/.config/idit/config.lua");
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // UI Font
+        static char uiFontBuf[128];
+        snprintf(uiFontBuf, sizeof(uiFontBuf), "%s", config_->settings.uiFont.family.c_str());
+        ImGui::Text("UI Font:");
+        ImGui::SameLine(120);
+        ImGui::PushItemWidth(200);
+        ImGui::InputText("##uifont", uiFontBuf, sizeof(uiFontBuf));
+        ImGui::SameLine();
+        ImGui::PushItemWidth(60);
+        ImGui::InputFloat("pt##uisize", &config_->settings.uiFont.size, 0.5f, 1.0f, "%.0f");
+        ImGui::PopItemWidth();
+        ImGui::PopItemWidth();
+        if (config_->settings.uiFont.size < 8) config_->settings.uiFont.size = 8;
+        if (config_->settings.uiFont.size > 48) config_->settings.uiFont.size = 48;
+
+        // Content Font
+        static char contentFontBuf[128];
+        snprintf(contentFontBuf, sizeof(contentFontBuf), "%s", config_->settings.contentFont.family.c_str());
+        ImGui::Text("Content Font:");
+        ImGui::SameLine(120);
+        ImGui::PushItemWidth(200);
+        ImGui::InputText("##contentfont", contentFontBuf, sizeof(contentFontBuf));
+        ImGui::SameLine();
+        ImGui::PushItemWidth(60);
+        ImGui::InputFloat("pt##contentsize", &config_->settings.contentFont.size, 0.5f, 1.0f, "%.0f");
+        ImGui::PopItemWidth();
+        ImGui::PopItemWidth();
+        if (config_->settings.contentFont.size < 8) config_->settings.contentFont.size = 8;
+        if (config_->settings.contentFont.size > 48) config_->settings.contentFont.size = 48;
+
+        // Theme
+        static char themeBuf[64];
+        snprintf(themeBuf, sizeof(themeBuf), "%s", config_->settings.theme.c_str());
+        ImGui::Text("Theme:");
+        ImGui::SameLine(120);
+        ImGui::PushItemWidth(200);
+        ImGui::InputText("##theme", themeBuf, sizeof(themeBuf));
+        ImGui::PopItemWidth();
+
+        ImGui::Spacing();
+
+        // Chunk settings
+        int winLines = static_cast<int>(config_->settings.windowLines);
+        ImGui::Text("Window Lines:");
+        ImGui::SameLine(120);
+        ImGui::PushItemWidth(100);
+        ImGui::InputInt("##winlines", &winLines, 10, 100);
+        ImGui::PopItemWidth();
+        if (winLines < 10) winLines = 10;
+        config_->settings.windowLines = static_cast<size_t>(winLines);
+
+        int chkSize = static_cast<int>(config_->settings.chunkSize / 1024);
+        ImGui::Text("Chunk Size (KB):");
+        ImGui::SameLine(120);
+        ImGui::PushItemWidth(100);
+        ImGui::InputInt("##chunksize", &chkSize, 16, 64);
+        ImGui::PopItemWidth();
+        if (chkSize < 1) chkSize = 1;
+        config_->settings.chunkSize = static_cast<size_t>(chkSize) * 1024;
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::TextDisabled("Font and theme changes require restart.");
+        ImGui::TextDisabled("Other changes apply to new files opened.");
+
+        ImGui::Spacing();
+
+        if (ImGui::Button("Save", ImVec2(100, 0))) {
+            config_->settings.uiFont.family = uiFontBuf;
+            config_->settings.contentFont.family = contentFontBuf;
+            config_->settings.theme = themeBuf;
+            config_->save();
+            showSettings_ = false;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(100, 0))) {
+            showSettings_ = false;
+        }
+
+        ImGui::EndPopup();
+    }
 }
