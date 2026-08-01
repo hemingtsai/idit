@@ -233,6 +233,12 @@ void LogViewer::moveCursor(int delta) {
     scrollX_ = 0;
 }
 
+void LogViewer::setCursorLine(size_t line) {
+    if (line < lines_.size()) {
+        cursorLine_ = line;
+    }
+}
+
 void LogViewer::scrollHorizontal(int delta) {
     if (delta > 0) {
         scrollX_ += static_cast<size_t>(delta);

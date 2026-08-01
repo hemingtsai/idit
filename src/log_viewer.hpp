@@ -103,6 +103,7 @@ public:
 
     // Navigation
     void moveCursor(int delta);
+    void setCursorLine(size_t line);   // jump cursor to a specific line in current chunk
     void scrollHorizontal(int delta);
     void loadNextChunk();
     void loadPrevChunk();
