@@ -382,12 +382,14 @@ void GUI::renderContent() {
             ImGui::TextUnformatted(line.c_str());
             ImGui::PopStyleColor();
 
-            // Click to select line
+            // Click to select line (PushID ensures unique IDs in the loop)
+            ImGui::PushID(static_cast<int>(idx));
             ImGui::SetCursorScreenPos(lineStart);
             ImGui::InvisibleButton("##ln", ImVec2(ImGui::GetWindowWidth(), lineH));
             if (ImGui::IsItemClicked()) {
                 viewer_->setCursorLine(idx);
             }
+            ImGui::PopID();
         }
     }
     clipper.End();
