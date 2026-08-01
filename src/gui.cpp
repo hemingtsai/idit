@@ -137,7 +137,6 @@ void GUI::render() {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(vp->Pos);
     ImGui::SetNextWindowSize(vp->Size);
-    ImGui::SetNextWindowViewport(vp->ID);
 
     ImGuiWindowFlags wflags =
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |

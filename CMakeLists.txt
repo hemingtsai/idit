@@ -91,8 +91,9 @@ target_link_libraries(idit-gui PRIVATE
     ${CMAKE_DL_LIBS}
 )
 
-# macOS: link additional frameworks needed by GLFW
+# macOS: suppress OpenGL deprecation warnings
 if(APPLE)
+    target_compile_definitions(idit-gui PRIVATE GL_SILENCE_DEPRECATION)
     target_link_libraries(idit-gui PRIVATE
         "-framework Cocoa"
         "-framework IOKit"
