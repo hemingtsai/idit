@@ -1,4 +1,5 @@
 #include "log_reader.hpp"
+#include "log_viewer.hpp"
 #include "theme.hpp"
 #include "tui.hpp"
 
@@ -91,14 +92,16 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Initialize and run TUI
+    // Create LogViewer core and TUI frontend
+    LogViewer viewer;
     TUI tui;
+
     if (!tui.init(theme)) {
         std::cerr << "Error: Failed to initialize ncurses.\n";
         return 1;
     }
 
-    tui.run(filepath, opts, follow_mode);
+    tui.run(viewer, filepath, opts, follow_mode);
 
     return 0;
 }

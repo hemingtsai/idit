@@ -85,7 +85,8 @@ public:
     // Search state
     bool isSearchActive()       const { return search_.active; }
     bool isFullSearch()         const { return search_.fullSearch; }
-    const std::string& searchPattern()    const { return search_.pattern; }
+    const std::string& searchPattern()      const { return search_.pattern; }
+    const std::string& searchLowerPattern() const { return search_.lowerPattern; }
     const std::vector<size_t>& searchMatches()  const { return search_.matchLines; }
     ssize_t searchCurrentMatch()        const { return search_.currentMatch; }
     bool isLineSearchMatch(size_t lineIdx)    const;
