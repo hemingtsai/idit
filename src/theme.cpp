@@ -1,4 +1,5 @@
 #include "theme.hpp"
+#include "config.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -7,6 +8,9 @@
 #include <map>
 #include <sstream>
 #include <string>
+
+#define SOL_ALL_SAFETIES_ON 1
+#include <sol/sol.hpp>
 
 // Color name -> ncurses COLOR_* mapping
 static const std::map<std::string, int> COLOR_MAP = {
@@ -136,4 +140,46 @@ void apply_theme(const Theme& theme) {
     init_pair(CP_TRUNCATION,   tf,  tb);
     init_pair(CP_SEARCH_BAR,   srf, srb);
     init_pair(CP_SEARCH_BAR_ERROR, COLOR_WHITE, COLOR_RED);
+}
+
+// ============================================================================
+// Lua theme loading
+// ============================================================================
+
+/// Load theme from a Lua file. Returns true on success.
+static bool load_theme_lua(const std::string& path, Theme& theme) {
+    sol::state lua;
+    lua.open_libraries(sol::lib::base, sol::lib::string);
+
+    auto result = lua.safe_script_file(path, sol::script_pass_on_error);
+    if (!result.valid()) return false;
+
+    sol::table t = result;
+    if (!t.valid()) return false;
+
+    theme.background       = t.get_or("background",       theme.background);
+    theme.foreground       = t.get_or("foreground",       theme.foreground);
+    theme.status_bar_bg    = t.get_or("status_bar_bg",    theme.status_bar_bg);
+    theme.status_bar_fg    = t.get_or("status_bar_fg",    theme.status_bar_fg);
+    theme.line_number_fg   = t.get_or("line_number_fg",   theme.line_number_fg);
+    theme.highlight_bg     = t.get_or("highlight_bg",     theme.highlight_bg);
+    theme.highlight_fg     = t.get_or("highlight_fg",     theme.highlight_fg);
+    theme.search_match_bg  = t.get_or("search_match_bg",  theme.search_match_bg);
+    theme.search_match_fg  = t.get_or("search_match_fg",  theme.search_match_fg);
+    theme.truncation_bg    = t.get_or("truncation_bg",    theme.truncation_bg);
+    theme.truncation_fg    = t.get_or("truncation_fg",    theme.truncation_fg);
+    theme.search_bar_bg    = t.get_or("search_bar_bg",    theme.search_bar_bg);
+    theme.search_bar_fg    = t.get_or("search_bar_fg",    theme.search_bar_fg);
+
+    return true;
+}
+
+bool load_theme_by_name(const std::string& name, Theme& theme) {
+    std::string luaPath = Config::themePath(name);
+    if (load_theme_lua(luaPath, theme)) return true;
+
+    std::string bundledPath = "themes/" + name + ".theme";
+    if (load_theme(bundledPath, theme)) return true;
+
+    return false;
 }

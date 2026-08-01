@@ -41,3 +41,8 @@ bool load_theme(const std::string& path, Theme& theme);
 
 /// Apply a theme to ncurses (initialize all color pairs).
 void apply_theme(const Theme& theme);
+
+/// Load a theme by name from ~/.config/idit/themes/<name>.lua,
+/// falling back to bundled themes/<name>.theme.
+/// Returns true on success.
+bool load_theme_by_name(const std::string& name, Theme& theme);
